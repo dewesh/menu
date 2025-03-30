@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 import 'firebase_service.dart';
+import 'meal_plan_service.dart';
 
 /// Service for User model operations
 class UserService {
@@ -122,6 +123,22 @@ class UserService {
   /// Update user preferences
   Future<void> updateUserPreferences(String userId, SystemPreferences preferences) async {
     try {
+      // Get current user data to detect changes
+      final currentUser = await getUserById(userId);
+      bool needsMealPlanUpdate = false;
+      
+      // Check if relevant preferences have changed
+      if (currentUser != null && currentUser.systemPreferences != null) {
+        final currentPrefs = currentUser.systemPreferences!;
+        
+        // Check if any meal plan relevant preferences changed
+        needsMealPlanUpdate = 
+            preferences.familySize != currentPrefs.familySize ||
+            _listsDiffer(preferences.dietaryPreferences, currentPrefs.dietaryPreferences) ||
+            _cuisinePreferencesDiffer(preferences.cuisinePreferences, currentPrefs.cuisinePreferences);
+      }
+      
+      // Update user preferences in Firestore
       await _firebaseService.updateDocument(
         '${Constants.usersCollection}/$userId',
         {
@@ -129,8 +146,77 @@ class UserService {
           'lastModified': Timestamp.fromDate(DateTime.now()),
         },
       );
+      
+      // If relevant preferences changed, update the meal plan
+      if (needsMealPlanUpdate) {
+        // Do this in the background without awaiting
+        _updateUserMealPlan(userId, preferences);
+      }
     } catch (e) {
       throw FirebaseServiceException('Failed to update preferences for user ID: $userId', e);
+    }
+  }
+  
+  /// Helper to check if two lists differ
+  bool _listsDiffer<T>(List<T> list1, List<T> list2) {
+    if (list1.length != list2.length) {
+      return true;
+    }
+    
+    for (int i = 0; i < list1.length; i++) {
+      if (!list2.contains(list1[i])) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /// Helper to check if cuisine preferences differ
+  bool _cuisinePreferencesDiffer(
+    List<CuisinePreference> list1, 
+    List<CuisinePreference> list2
+  ) {
+    if (list1.length != list2.length) {
+      return true;
+    }
+    
+    for (final pref1 in list1) {
+      bool found = false;
+      for (final pref2 in list2) {
+        if (pref1.cuisineType == pref2.cuisineType && 
+            pref1.frequencyPreference == pref2.frequencyPreference) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /// Update meal plan based on new preferences
+  Future<void> _updateUserMealPlan(String userId, SystemPreferences preferences) async {
+    try {
+      print('Updating meal plan for user $userId due to preference changes');
+      
+      final mealPlanService = MealPlanService.instance;
+      
+      // This will either create a new plan or update the existing one
+      await mealPlanService.getOrCreateMealPlan(
+        userId: userId,
+        cuisinePreferences: preferences.cuisinePreferences,
+        dietaryPreferences: preferences.dietaryPreferences,
+        familySize: preferences.familySize,
+      );
+      
+      print('Meal plan updated successfully');
+    } catch (e) {
+      print('Error updating meal plan after preference change: $e');
+      // Don't throw - this is a background operation
     }
   }
 } 

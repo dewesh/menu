@@ -7,6 +7,7 @@ import '../../services/service_test.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'edit_cuisine_preferences_screen.dart';
 
 /// Preferences screen for user settings
 class PreferencesScreen extends StatefulWidget {
@@ -42,179 +43,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     // Note: App restart needed to see theme change in some cases
   }
 
-  Future<void> _viewCuisinePreferences() async {
-    // Show a loading dialog first
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const AlertDialog(
-          title: Row(
-            children: [
-              SizedBox(height: 24, width: 24, child: CircularProgressIndicator()),
-              SizedBox(width: 16),
-              Text('Loading Preferences'),
-            ],
-          ),
-          content: Text('Fetching your cuisine preferences from Firebase...'),
-        );
-      },
+  // Navigate to the Edit Cuisine Preferences screen
+  void _navigateToEditCuisinePreferences() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const EditCuisinePreferencesScreen(),
+      ),
     );
-    
-    try {
-      // Get the user ID
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString(Constants.prefUserId);
-      
-      if (userId == null || userId.isEmpty) {
-        // Close loading dialog
-        if (mounted) Navigator.of(context).pop();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID not found. Complete onboarding first.'))
-        );
-        return;
-      }
-      
-      // Fetch the user document from Firestore
-      final userDoc = await FirebaseService.instance.getDocument('${Constants.usersCollection}/$userId');
-      
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
-      
-      if (!userDoc.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User document not found in Firestore.'))
-        );
-        return;
-      }
-      
-      final userData = userDoc.data() as Map<String, dynamic>;
-      
-      // Check if fullCuisinePreferences exists
-      if (!userData.containsKey('fullCuisinePreferences') || 
-          userData['fullCuisinePreferences'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No cuisine preferences found with frequency levels.'))
-        );
-        return;
-      }
-      
-      // Extract the cuisine preferences with their frequency
-      final prefList = List<Map<String, dynamic>>.from(userData['fullCuisinePreferences']);
-      
-      // Show dialog with preferences
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.restaurant),
-                  SizedBox(width: 8),
-                  Text('Cuisine Preferences'),
-                ],
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: prefList.isEmpty 
-                  ? const Text('No cuisine preferences saved yet.')
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: prefList.length,
-                      itemBuilder: (context, index) {
-                        final pref = prefList[index];
-                        final cuisineType = pref['cuisineType'] as String? ?? 'Unknown';
-                        final frequency = pref['frequencyPreference'] as String? ?? 'Unknown';
-                        
-                        String frequencyText;
-                        Color frequencyColor;
-                        
-                        // Set color and text based on frequency
-                        switch (frequency) {
-                          case 'daily':
-                            frequencyText = 'Daily';
-                            frequencyColor = Colors.green;
-                            break;
-                          case 'weekly':
-                            frequencyText = 'Weekly';
-                            frequencyColor = Colors.blue;
-                            break;
-                          case 'occasionally':
-                            frequencyText = 'Occasionally';
-                            frequencyColor = Colors.orange;
-                            break;
-                          case 'rarely':
-                            frequencyText = 'Rarely';
-                            frequencyColor = Colors.red;
-                            break;
-                          default:
-                            frequencyText = frequency;
-                            frequencyColor = Colors.grey;
-                        }
-                        
-                        return ListTile(
-                          title: Text(cuisineType),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12, 
-                              vertical: 6
-                            ),
-                            decoration: BoxDecoration(
-                              color: frequencyColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              frequencyText,
-                              style: TextStyle(
-                                color: frequencyColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Edit functionality will be implemented soon!'))
-                    );
-                    // TODO: Navigate to a screen for editing cuisine preferences
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit, size: 16),
-                      SizedBox(width: 4),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      }
-    } catch (e) {
-      // Close loading dialog if it's still open
-      if (mounted) Navigator.of(context).pop();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching preferences: ${e.toString()}'))
-      );
-    }
   }
 
   Future<void> _resetOnboarding() async {
@@ -622,10 +457,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           ),
           ListTile(
             title: const Text('Cuisine Preferences'),
-            subtitle: const Text('View and update your cuisine preferences with frequency levels'),
+            subtitle: const Text('Update your cuisine preferences and frequency levels'),
             leading: const Icon(Icons.restaurant),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: _viewCuisinePreferences,
+            onTap: _navigateToEditCuisinePreferences,
           ),
           ListTile(
             title: const Text('Family Size'),

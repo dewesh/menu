@@ -8,7 +8,7 @@ class MealPlan {
   final String title;
   final DateTime createdAt;
   final DateTime lastModified;
-  final List<MealPlanDay> days;
+  final Map<DateTime, MealPlanDay> days;
   final Map<String, dynamic> generationParameters;
   final bool isFavorite;
 
@@ -25,13 +25,18 @@ class MealPlan {
 
   /// Convert MealPlan to a map for Firestore
   Map<String, dynamic> toMap() {
+    final Map<String, dynamic> daysMap = {};
+    days.forEach((date, day) {
+      daysMap[date.toIso8601String()] = day.toMap();
+    });
+
     return {
       'mealPlanId': mealPlanId,
       'userId': userId,
       'title': title,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastModified': Timestamp.fromDate(lastModified),
-      'days': days.map((day) => day.toMap()).toList(),
+      'days': daysMap,
       'generationParameters': generationParameters,
       'isFavorite': isFavorite,
     };
@@ -39,15 +44,38 @@ class MealPlan {
 
   /// Create MealPlan from a map (Firestore document)
   factory MealPlan.fromMap(Map<String, dynamic> map) {
+    final Map<DateTime, MealPlanDay> daysMap = {};
+    
+    // Handle both old format (List) and new format (Map)
+    if (map['days'] is List) {
+      // Old format: List of days
+      final List<dynamic> rawDaysList = map['days'] as List;
+      final now = DateTime.now();
+      final startDate = DateTime(now.year, now.month, now.day);
+      
+      // Convert from list to map with dates
+      for (int i = 0; i < rawDaysList.length; i++) {
+        final date = startDate.add(Duration(days: i));
+        final dayData = rawDaysList[i] as Map<String, dynamic>;
+        daysMap[date] = MealPlanDay.fromMap(dayData);
+      }
+    } else {
+      // New format: Map with date strings as keys
+      final Map<String, dynamic> rawDays = Map<String, dynamic>.from(map['days'] as Map);
+      
+      rawDays.forEach((dateString, dayData) {
+        final date = DateTime.parse(dateString);
+        daysMap[date] = MealPlanDay.fromMap(dayData as Map<String, dynamic>);
+      });
+    }
+
     return MealPlan(
       mealPlanId: map['mealPlanId'] as String,
       userId: map['userId'] as String,
       title: map['title'] as String,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       lastModified: (map['lastModified'] as Timestamp).toDate(),
-      days: (map['days'] as List)
-          .map((dayMap) => MealPlanDay.fromMap(dayMap as Map<String, dynamic>))
-          .toList(),
+      days: daysMap,
       generationParameters: Map<String, dynamic>.from(map['generationParameters'] as Map),
       isFavorite: map['isFavorite'] as bool? ?? false,
     );
@@ -77,13 +105,18 @@ class MealPlan {
         throw FormatException('Meal plan contains no days');
       }
       
-      final days = <MealPlanDay>[];
+      final Map<DateTime, MealPlanDay> daysMap = {};
+      final startDate = now.subtract(Duration(hours: now.hour, minutes: now.minute, seconds: now.second, milliseconds: now.millisecond));
       
       // Process each day with error handling
-      for (var dayData in rawDays) {
+      for (int i = 0; i < rawDays.length; i++) {
         try {
+          final dayData = rawDays[i];
           if (dayData is Map<String, dynamic>) {
-            days.add(MealPlanDay.fromAIResponse(dayData));
+            final date = startDate.add(Duration(days: i));
+            final dayNumber = dayData['day'] as int? ?? (i + 1);
+            
+            daysMap[date] = MealPlanDay.fromAIResponse(dayData, date);
           } else {
             print('Warning: Skipping invalid day data: $dayData');
           }
@@ -93,20 +126,17 @@ class MealPlan {
         }
       }
       
-      if (days.isEmpty) {
+      if (daysMap.isEmpty) {
         throw FormatException('Failed to process any valid days from the meal plan');
       }
-
-      // Sort days by day number if needed
-      days.sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
 
       return MealPlan(
         mealPlanId: mealPlanId,
         userId: userId,
-        title: title ?? 'Meal Plan for ${days.length} days',
+        title: title ?? 'Meal Plan starting ${startDate.toIso8601String().substring(0, 10)}',
         createdAt: now,
         lastModified: now,
-        days: days,
+        days: daysMap,
         generationParameters: generationParameters,
       );
     } catch (e) {
@@ -122,7 +152,7 @@ class MealPlan {
     String? title,
     DateTime? createdAt,
     DateTime? lastModified,
-    List<MealPlanDay>? days,
+    Map<DateTime, MealPlanDay>? days,
     Map<String, dynamic>? generationParameters,
     bool? isFavorite,
   }) {
@@ -141,6 +171,7 @@ class MealPlan {
 
 /// A single day in a meal plan
 class MealPlanDay {
+  final DateTime date;
   final int dayNumber;
   final Meal breakfast;
   final Meal lunch;
@@ -148,6 +179,7 @@ class MealPlanDay {
   final Meal snack;
 
   MealPlanDay({
+    required this.date,
     required this.dayNumber,
     required this.breakfast,
     required this.lunch,
@@ -158,6 +190,7 @@ class MealPlanDay {
   /// Convert MealPlanDay to a map for Firestore
   Map<String, dynamic> toMap() {
     return {
+      'date': Timestamp.fromDate(date),
       'dayNumber': dayNumber,
       'breakfast': breakfast.toMap(),
       'lunch': lunch.toMap(),
@@ -168,8 +201,29 @@ class MealPlanDay {
 
   /// Create MealPlanDay from a map (Firestore document)
   factory MealPlanDay.fromMap(Map<String, dynamic> map) {
+    DateTime date;
+    
+    // Handle date field if present
+    if (map.containsKey('date') && map['date'] != null) {
+      // Handle date as Timestamp or String
+      if (map['date'] is Timestamp) {
+        date = (map['date'] as Timestamp).toDate();
+      } else if (map['date'] is String) {
+        date = DateTime.parse(map['date'] as String);
+      } else {
+        // Default to today if date format is unrecognized
+        date = DateTime.now();
+      }
+    } else {
+      // For backward compatibility with old data format without date field
+      // Use day number if available, otherwise default to today
+      final int dayNumber = map.containsKey('dayNumber') ? (map['dayNumber'] as int) : 1;
+      date = DateTime.now().add(Duration(days: dayNumber - 1));
+    }
+
     return MealPlanDay(
-      dayNumber: map['dayNumber'] as int,
+      date: date,
+      dayNumber: map.containsKey('dayNumber') ? (map['dayNumber'] as int) : 1,
       breakfast: Meal.fromMap(map['breakfast'] as Map<String, dynamic>),
       lunch: Meal.fromMap(map['lunch'] as Map<String, dynamic>),
       dinner: Meal.fromMap(map['dinner'] as Map<String, dynamic>),
@@ -178,12 +232,10 @@ class MealPlanDay {
   }
 
   /// Create MealPlanDay from the AI generated JSON
-  factory MealPlanDay.fromAIResponse(Map<String, dynamic> dayData) {
+  factory MealPlanDay.fromAIResponse(Map<String, dynamic> dayData, DateTime date) {
     try {
-      // Validate day number exists
       final dayNumber = dayData.containsKey('day') ? dayData['day'] as int : 1;
       
-      // Create a placeholder for missing or invalid meals
       final placeholderMeal = Meal(
         name: "Meal data unavailable",
         cuisineType: "Not specified",
@@ -192,7 +244,6 @@ class MealPlanDay {
         nutritionalInfo: NutritionalInfo(calories: 0, protein: 0, carbs: 0, fat: 0),
       );
       
-      // Parse each meal with error handling
       Meal breakfast = placeholderMeal;
       Meal lunch = placeholderMeal;
       Meal dinner = placeholderMeal;
@@ -239,6 +290,7 @@ class MealPlanDay {
       }
       
       return MealPlanDay(
+        date: date,
         dayNumber: dayNumber,
         breakfast: breakfast,
         lunch: lunch,
