@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+import 'services/firebase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -55,16 +63,57 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
+  final FirebaseService _firebaseService = FirebaseService();
+  bool _isLoading = true;
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _loadCounter();
+  }
+
+  // Load counter value from Firestore
+  Future<void> _loadCounter() async {
+    try {
+      // Try to get the counter document
+      final doc = await _firebaseService.getDocument('counters/app_counter');
+      
+      if (doc.exists) {
+        // If document exists, get the count value
+        final data = doc.data() as Map<String, dynamic>?;
+        setState(() {
+          _counter = data?['count'] ?? 0;
+          _isLoading = false;
+        });
+      } else {
+        // If document doesn't exist, create it with count 0
+        await _firebaseService.setDocument('counters/app_counter', {'count': 0});
+        setState(() {
+          _counter = 0;
+          _isLoading = false;
+        });
+      }
+      print('Successfully loaded counter from Firestore');
+    } catch (e) {
+      print('Error loading counter from Firestore: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _incrementCounter() async {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
       _counter++;
     });
+    
+    try {
+      // Update the counter in Firestore
+      await _firebaseService.setDocument('counters/app_counter', {'count': _counter});
+      print('Successfully updated counter in Firestore');
+    } catch (e) {
+      print('Error updating counter in Firestore: $e');
+    }
   }
 
   @override
@@ -88,29 +137,41 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
+        child: _isLoading
+            ? const CircularProgressIndicator()
+            : Column(
+                // Column is also a layout widget. It takes a list of children and
+                // arranges them vertically. By default, it sizes itself to fit its
+                // children horizontally, and tries to be as tall as its parent.
+                //
+                // Column has various properties to control how it sizes itself and
+                // how it positions its children. Here we use mainAxisAlignment to
+                // center the children vertically; the main axis here is the vertical
+                // axis because Columns are vertical (the cross axis would be
+                // horizontal).
+                //
+                // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+                // action in the IDE, or press "p" in the console), to see the
+                // wireframe for each widget.
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  const Text(
+                    'You have pushed the button this many times:',
+                  ),
+                  Text(
+                    '$_counter',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Counter value is stored in Firestore!',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,

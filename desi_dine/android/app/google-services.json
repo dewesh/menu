@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1027305994803",
+    "project_id": "menu-16282",
+    "storage_bucket": "menu-16282.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1027305994803:android:e47620e91d836ab9528146",
+        "android_client_info": {
+          "package_name": "com.example.desi_dine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuE334HBNMEfMjlpWhxqCk9f3_g2IK1Os"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
