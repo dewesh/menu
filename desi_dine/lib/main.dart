@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'utils/theme.dart';
@@ -16,7 +17,39 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await _initializeRemoteConfig();
   runApp(const MyApp());
+}
+
+/// Initialize Firebase Remote Config with default values
+Future<void> _initializeRemoteConfig() async {
+  final remoteConfig = FirebaseRemoteConfig.instance;
+  
+  try {
+    // Set default values
+    await remoteConfig.setDefaults({
+      Constants.remoteConfigAiProvider: Constants.aiProviderOpenAI,
+      Constants.remoteConfigOpenAiKey: '',
+      Constants.remoteConfigOpenAiModel: Constants.aiModelOpenAI,
+      Constants.remoteConfigAnthropicKey: '',
+      Constants.remoteConfigAnthropicModel: Constants.aiModelAnthropic,
+      Constants.remoteConfigGoogleKey: '',
+      Constants.remoteConfigGoogleModel: Constants.aiModelGoogle,
+    });
+    
+    // Configure fetch settings
+    await remoteConfig.setConfigSettings(RemoteConfigSettings(
+      fetchTimeout: const Duration(minutes: 1),
+      minimumFetchInterval: const Duration(hours: 1),
+    ));
+    
+    // Fetch and activate
+    await remoteConfig.fetchAndActivate();
+    
+    debugPrint('Remote Config initialized successfully');
+  } catch (e) {
+    debugPrint('Error initializing Remote Config: $e');
+  }
 }
 
 class MyApp extends StatefulWidget {

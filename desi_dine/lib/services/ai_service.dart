@@ -410,6 +410,9 @@ abstract class AIService {
   /// Get the current AI provider configuration
   Future<AIProviderConfig?> getConfig();
   
+  /// Save the AI provider configuration
+  Future<void> saveConfig(AIProviderConfig config);
+  
   /// Test the connection to the AI provider API
   Future<bool> testConnection();
   
@@ -511,6 +514,19 @@ class OpenAIService extends AIService {
   @override
   Future<AIProviderConfig?> getConfig() async {
     return _config;
+  }
+  
+  @override
+  Future<void> saveConfig(AIProviderConfig config) async {
+    _config = config;
+    // You would typically save this to persistent storage here
+    // For example, using SharedPreferences or Firestore
+    try {
+      // For now, we'll just update the in-memory config
+      debugPrint('Saving config: ${config.provider}, ${config.model}');
+    } catch (e) {
+      throw AIServiceException('Failed to save AI provider configuration: $e');
+    }
   }
   
   @override

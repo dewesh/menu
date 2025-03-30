@@ -31,6 +31,15 @@ class Constants {
   static const String aiModelAnthropic = 'claude-2';
   static const String aiModelGoogle = 'gemini-pro';
   
+  // Remote Config Keys
+  static const String remoteConfigAiProvider = 'ai_provider';
+  static const String remoteConfigOpenAiKey = 'openai_api_key';
+  static const String remoteConfigOpenAiModel = 'openai_model';
+  static const String remoteConfigAnthropicKey = 'anthropic_api_key';
+  static const String remoteConfigAnthropicModel = 'anthropic_model';
+  static const String remoteConfigGoogleKey = 'google_api_key';
+  static const String remoteConfigGoogleModel = 'google_model';
+  
   // Routes
   static const String routeOnboarding = '/onboarding';
   static const String routeHome = '/home';
