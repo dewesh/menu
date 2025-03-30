@@ -12,6 +12,7 @@ class Constants {
   static const String mealsCollection = 'meals';
   static const String mealPlansCollection = 'mealPlans';
   static const String groceryListsCollection = 'groceryLists';
+  static const String ingredientsCollection = 'ingredients';
   
   // Shared Preferences Keys
   static const String prefIsOnboardingComplete = 'isOnboardingComplete';
