@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import '../../services/navigation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/model_test.dart';
 
 /// Preferences screen for user settings
 class PreferencesScreen extends StatefulWidget {
@@ -47,6 +48,95 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         const SnackBar(content: Text('Onboarding reset successful. Restart the app to see changes.')),
       );
     }
+  }
+  
+  void _runModelTests() {
+    try {
+      // Run tests and get results
+      final testResults = ModelTest.testAllModels();
+      
+      // Show results in a dialog
+      _showTestResultsDialog(testResults);
+      
+      // Also show a success snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All model tests passed! See results in the dialog.')),
+        );
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Test failed: ${e.toString()}')),
+        );
+      }
+    }
+  }
+  
+  void _showTestResultsDialog(List<String> results) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.science, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Model Test Results'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: results.length,
+              itemBuilder: (context, index) {
+                final result = results[index];
+                // Apply different styling based on result content
+                if (result.contains('✅ SUCCESS')) {
+                  return ListTile(
+                    leading: const Icon(Icons.check_circle, color: Colors.green),
+                    title: Text(result),
+                    dense: true,
+                  );
+                } else if (result.contains('❌ FAILED')) {
+                  return ListTile(
+                    leading: const Icon(Icons.error, color: Colors.red),
+                    title: Text(result),
+                    dense: true,
+                  );
+                } else if (result.startsWith('Testing')) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+                    child: Text(
+                      result,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 16,
+                      ),
+                    ),
+                  );
+                } else {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Text(result),
+                  );
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -129,6 +219,12 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             subtitle: const Text('Clear onboarding completion status for testing'),
             trailing: const Icon(Icons.refresh),
             onTap: _resetOnboarding,
+          ),
+          ListTile(
+            title: const Text('Test Data Models'),
+            subtitle: const Text('Run tests to verify data models are working correctly'),
+            trailing: const Icon(Icons.science),
+            onTap: _runModelTests,
           ),
           // App version info
           Padding(
