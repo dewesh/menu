@@ -16,6 +16,9 @@ class MealPlanService {
   /// Firebase service reference
   final FirebaseService _firebaseService = FirebaseService.instance;
   
+  // Constants
+  static const int DEFAULT_MEAL_PLAN_DAYS = 7;
+  
   // Private constructor for singleton pattern
   MealPlanService._internal();
   
@@ -78,8 +81,8 @@ class MealPlanService {
         familySize = familySize ?? user.systemPreferences?.familySize ?? 1;
       }
       
-      // Default to 7 days for a new meal plan
-      const numberOfDays = 7;
+      // Always use DEFAULT_MEAL_PLAN_DAYS for a new meal plan
+      print('Creating a new meal plan with $DEFAULT_MEAL_PLAN_DAYS days.');
       
       // Generate a new meal plan
       return await generateMealPlan(
@@ -87,7 +90,7 @@ class MealPlanService {
         cuisinePreferences: cuisinePreferences,
         dietaryPreferences: dietaryPreferences,
         familySize: familySize,
-        numberOfDays: numberOfDays,
+        numberOfDays: DEFAULT_MEAL_PLAN_DAYS,
       );
     } catch (e) {
       print('Error getting or creating meal plan: $e');
@@ -203,7 +206,9 @@ class MealPlanService {
           .toList();
           
       final familySize = generationParameters['familySize'] as int;
-      final numberOfDays = existingMealPlan.days.length;
+      
+      // Always use DEFAULT_MEAL_PLAN_DAYS instead of the existing meal plan's day count
+      print('Regenerating meal plan with $DEFAULT_MEAL_PLAN_DAYS days for user ${existingMealPlan.userId}');
       
       // Generate a new meal plan
       return await generateMealPlan(
@@ -211,7 +216,7 @@ class MealPlanService {
         cuisinePreferences: cuisinePreferences,
         dietaryPreferences: dietaryPreferences,
         familySize: familySize,
-        numberOfDays: numberOfDays,
+        numberOfDays: DEFAULT_MEAL_PLAN_DAYS,
         additionalPreferences: generationParameters['additionalPreferences'],
       );
     } catch (e) {

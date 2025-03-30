@@ -202,18 +202,25 @@ class UserService {
   Future<void> _updateUserMealPlan(String userId, SystemPreferences preferences) async {
     try {
       print('Updating meal plan for user $userId due to preference changes');
+      print('Preferences: ${preferences.cuisinePreferences.length} cuisine preferences, ' +
+            '${preferences.dietaryPreferences.length} dietary preferences, ' +
+            'family size: ${preferences.familySize}');
       
       final mealPlanService = MealPlanService.instance;
       
       // This will either create a new plan or update the existing one
-      await mealPlanService.getOrCreateMealPlan(
+      // It should generate a 7-day meal plan
+      print('Generating a 7-day meal plan for user $userId');
+      
+      final mealPlan = await mealPlanService.getOrCreateMealPlan(
         userId: userId,
         cuisinePreferences: preferences.cuisinePreferences,
         dietaryPreferences: preferences.dietaryPreferences,
         familySize: preferences.familySize,
       );
       
-      print('Meal plan updated successfully');
+      print('Meal plan updated successfully. Day count: ${mealPlan.days.length}');
+      print('Meal plan dates: ${mealPlan.days.keys.map((date) => date.toIso8601String().substring(0, 10)).join(', ')}');
     } catch (e) {
       print('Error updating meal plan after preference change: $e');
       // Don't throw - this is a background operation
