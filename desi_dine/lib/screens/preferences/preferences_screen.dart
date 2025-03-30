@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/model_test.dart';
 import '../../services/service_test.dart';
 import '../../services/firebase_service.dart';
+import '../../services/ai_service.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 /// Preferences screen for user settings
 class PreferencesScreen extends StatefulWidget {
@@ -431,12 +433,183 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             ),
           ),
           ListTile(
-            title: const Text('AI Configuration'),
-            subtitle: const Text('Configure AI provider settings for meal planning'),
+            title: const Text('About AI Configuration'),
+            subtitle: const Text('AI services for meal planning are managed by the app administrator'),
             leading: const Icon(Icons.smart_toy),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: const Icon(Icons.info_outline),
             onTap: () {
-              Navigator.of(context).pushNamed(Constants.routeAiConfig);
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Row(
+                      children: [
+                        Icon(Icons.smart_toy, color: Theme.of(context).primaryColor),
+                        const SizedBox(width: 10),
+                        const Text('AI Configuration'),
+                      ],
+                    ),
+                    content: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'The AI configuration for meal planning is managed by the app administrator.',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'This ensures that the AI services are properly maintained and updated with appropriate models and API keys.',
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Close'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          try {
+                            // Set minimum fetch interval to 0 to force fetch
+                            await FirebaseRemoteConfig.instance.setConfigSettings(
+                              RemoteConfigSettings(
+                                fetchTimeout: const Duration(minutes: 1),
+                                minimumFetchInterval: Duration.zero,
+                              ),
+                            );
+                            
+                            // Show loading indicator
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Testing API connection...'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                            
+                            // Fetch and activate the config
+                            await FirebaseRemoteConfig.instance.fetchAndActivate();
+                            
+                            // Get all important config values and log them
+                            final remoteConfig = FirebaseRemoteConfig.instance;
+                            final provider = remoteConfig.getString(Constants.remoteConfigAiProvider);
+                            final openaiKey = remoteConfig.getString(Constants.remoteConfigOpenAiKey);
+                            final openaiModel = remoteConfig.getString(Constants.remoteConfigOpenAiModel);
+                            final anthropicKey = remoteConfig.getString(Constants.remoteConfigAnthropicKey);
+                            final anthropicModel = remoteConfig.getString(Constants.remoteConfigAnthropicModel);
+                            final googleKey = remoteConfig.getString(Constants.remoteConfigGoogleKey);
+                            final googleModel = remoteConfig.getString(Constants.remoteConfigGoogleModel);
+                            
+                            debugPrint('Remote Config Values:');
+                            debugPrint('AI Provider: $provider');
+                            // Only show first/last 5 chars of keys for security
+                            if (openaiKey.isNotEmpty && openaiKey.length > 10) {
+                              final keyPreview = '${openaiKey.substring(0, 5)}...${openaiKey.substring(openaiKey.length - 5)}';
+                              debugPrint('OpenAI Key: $keyPreview');
+                            } else {
+                              debugPrint('OpenAI Key: ${openaiKey.isEmpty ? "[empty]" : "[too short]"}');
+                            }
+                            debugPrint('OpenAI Model: $openaiModel');
+                            debugPrint('Anthropic Key: ${anthropicKey.isEmpty ? "[empty]" : "[set]"}');
+                            debugPrint('Google Key: ${googleKey.isEmpty ? "[empty]" : "[set]"}');
+                            
+                            // Create an AI service with the latest values
+                            final aiService = await AIService.create();
+                            final config = await aiService.getConfig();
+                            
+                            debugPrint('Created AI service with provider: ${config?.provider}, model: ${config?.model}');
+                            
+                            // Test the connection to verify API key works
+                            bool connectionSuccess = false;
+                            String resultMessage = '';
+                            try {
+                              connectionSuccess = await aiService.testConnection();
+                              resultMessage = 'API connection successful! The API key is working.';
+                              debugPrint('✅ API connection test: SUCCESS');
+                            } catch (e) {
+                              // Handle specific API errors
+                              if (e.toString().contains('insufficient_quota')) {
+                                resultMessage = 'Your API key has insufficient quota. Please check your account billing status.';
+                              } else if (e.toString().contains('invalid_api_key')) {
+                                resultMessage = 'The API key is invalid. Please update the key in Firebase Remote Config.';
+                              } else {
+                                resultMessage = 'API connection failed: ${e.toString()}';
+                              }
+                              debugPrint('❌ API connection test FAILED: $e');
+                            }
+                            
+                            // Display the results
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(resultMessage),
+                                backgroundColor: connectionSuccess ? Colors.green : Colors.red,
+                                duration: const Duration(seconds: 5),
+                                action: connectionSuccess ? null : SnackBarAction(
+                                  label: 'HELP',
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('API Connection Help'),
+                                        content: SingleChildScrollView(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text('Troubleshooting steps:'),
+                                              const SizedBox(height: 8),
+                                              const Text('1. Verify your API key is correct in the Firebase Remote Config'),
+                                              const Text('2. Ensure you have sufficient quota/credits with your API provider'),
+                                              const Text('3. Check if the AI service is experiencing downtime'),
+                                              const SizedBox(height: 16),
+                                              const Text('API Response Details:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              const SizedBox(height: 8),
+                                              Text('Provider: ${config?.provider}'),
+                                              Text('Model: ${config?.model}'),
+                                              Text('Error: ${resultMessage.replaceAll("API connection failed: ", "")}'),
+                                            ],
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(context).pop(),
+                                            child: const Text('CLOSE'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  textColor: Colors.white,
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            debugPrint('Error testing config: $e');
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: ${e.toString()}'),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 5),
+                              ),
+                            );
+                          }
+                          
+                          // Close the dialog if open
+                          if (mounted && Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        child: const Text('Test Config'),
+                      ),
+                    ],
+                  );
+                },
+              );
             },
           ),
           ListTile(

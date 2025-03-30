@@ -3,7 +3,7 @@ import '../models/meal_plan_model.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 import 'firebase_service.dart';
-import 'ai_service.dart';
+import 'ai_service.dart' as ai;
 
 /// Service for meal plan operations including AI generation
 class MealPlanService {
@@ -29,9 +29,6 @@ class MealPlanService {
     Map<String, dynamic>? additionalPreferences,
   }) async {
     try {
-      // Create the AI service
-      final aiService = await AIService.create();
-      
       // Prepare parameters
       final generationParameters = {
         'cuisinePreferences': cuisinePreferences.map((p) => {
@@ -43,6 +40,23 @@ class MealPlanService {
         'numberOfDays': numberOfDays,
         'additionalPreferences': additionalPreferences,
       };
+      
+      // For larger meal plans, generate in batches to avoid token limit issues
+      if (numberOfDays > 3) {
+        return await _generateMealPlanInBatches(
+          userId: userId,
+          cuisinePreferences: cuisinePreferences, 
+          dietaryPreferences: dietaryPreferences,
+          familySize: familySize,
+          numberOfDays: numberOfDays,
+          title: title,
+          generationParameters: generationParameters,
+          additionalPreferences: additionalPreferences,
+        );
+      }
+      
+      // For smaller meal plans, generate all at once
+      final aiService = await ai.AIService.create();
       
       // Generate the meal plan using AI
       final aiResponse = await aiService.generateMealPlan(
@@ -67,6 +81,90 @@ class MealPlanService {
       return mealPlan;
     } catch (e) {
       print('Error generating meal plan: $e');
+      rethrow;
+    }
+  }
+  
+  /// Generate a meal plan in batches to avoid token limit issues
+  Future<MealPlan> _generateMealPlanInBatches({
+    required String userId,
+    required List<CuisinePreference> cuisinePreferences,
+    required List<String> dietaryPreferences,
+    required int familySize,
+    required int numberOfDays,
+    required Map<String, dynamic> generationParameters,
+    String? title,
+    Map<String, dynamic>? additionalPreferences,
+  }) async {
+    try {
+      print('Generating meal plan in batches for $numberOfDays days');
+      
+      // Create the AI service
+      final aiService = await ai.AIService.create();
+      
+      // Use a batch size of 2 days to ensure we stay within token limits
+      const int batchSize = 2;
+      final List<MealPlanDay> allDays = [];
+      
+      // Calculate number of batches needed
+      final int numberOfBatches = (numberOfDays / batchSize).ceil();
+      
+      // Generate each batch
+      for (int batchIndex = 0; batchIndex < numberOfBatches; batchIndex++) {
+        // Calculate the number of days for this batch
+        final int daysInThisBatch = (batchIndex == numberOfBatches - 1 && numberOfDays % batchSize != 0)
+            ? numberOfDays % batchSize  // Last batch might be smaller
+            : batchSize;
+        
+        print('Generating batch ${batchIndex + 1}/$numberOfBatches with $daysInThisBatch days');
+        
+        // Generate this batch of days
+        final batchResponse = await aiService.generateMealPlan(
+          cuisinePreferences: cuisinePreferences,
+          dietaryPreferences: dietaryPreferences,
+          familySize: familySize,
+          numberOfDays: daysInThisBatch,
+          additionalPreferences: additionalPreferences,
+        );
+        
+        // Extract days from response
+        final rawDays = (batchResponse['mealPlan']['days'] as List);
+        final batchDays = rawDays
+            .map((dayData) {
+              // Adjust day number to be consecutive across batches
+              final adjustedDayData = Map<String, dynamic>.from(dayData as Map<String, dynamic>);
+              adjustedDayData['day'] = adjustedDayData['day'] + (batchIndex * batchSize);
+              return MealPlanDay.fromAIResponse(adjustedDayData);
+            })
+            .toList();
+            
+        // Add days from this batch to the complete list
+        allDays.addAll(batchDays);
+      }
+      
+      // Sort days by day number
+      allDays.sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+      
+      // Create the combined meal plan
+      final now = DateTime.now();
+      final mealPlanId = FirebaseFirestore.instance.collection('mealPlans').doc().id;
+      
+      final mealPlan = MealPlan(
+        mealPlanId: mealPlanId,
+        userId: userId,
+        title: title ?? 'Meal Plan for $numberOfDays days',
+        createdAt: now,
+        lastModified: now,
+        days: allDays,
+        generationParameters: generationParameters,
+      );
+      
+      // Save the meal plan to Firestore
+      await saveMealPlan(mealPlan);
+      
+      return mealPlan;
+    } catch (e) {
+      print('Error generating meal plan in batches: $e');
       rethrow;
     }
   }
@@ -182,7 +280,7 @@ class MealPlanService {
   }) async {
     try {
       // Create the AI service
-      final aiService = await AIService.create();
+      final aiService = await ai.AIService.create();
       
       // Extract parameters from the original meal plan
       final params = mealPlan.generationParameters;
@@ -198,30 +296,36 @@ class MealPlanService {
           .toList();
           
       final familySize = params['familySize'] as int;
-      final additionalPreferences = params['additionalPreferences'] as Map<String, dynamic>?;
       
-      // Generate a single day meal plan
+      // Generate just one day
       final aiResponse = await aiService.generateMealPlan(
         cuisinePreferences: cuisinePreferences,
         dietaryPreferences: dietaryPreferences,
         familySize: familySize,
-        numberOfDays: 1, // Generate just one day
-        additionalPreferences: additionalPreferences,
+        numberOfDays: 1, // Just one day
+        additionalPreferences: params['additionalPreferences'],
       );
       
-      // Parse the response
-      final dayData = (aiResponse['mealPlan']['days'] as List).first as Map<String, dynamic>;
+      // Extract the day from the response
+      final dayData = (aiResponse['mealPlan']['days'] as List).first;
       
-      // Create a MealPlanDay with the correct day number
-      final adjustedDayData = Map<String, dynamic>.from(dayData);
+      // Since AI returned day 1, we need to adjust the day number to match the requested day
+      final adjustedDayData = Map<String, dynamic>.from(dayData as Map<String, dynamic>);
       adjustedDayData['day'] = dayNumber;
       
+      // Create a new day object
       final newDay = MealPlanDay.fromAIResponse(adjustedDayData);
       
-      // Create updated days list
-      final updatedDays = mealPlan.days.map((day) {
-        return day.dayNumber == dayNumber ? newDay : day;
-      }).toList();
+      // Update the meal plan with the new day
+      final updatedDays = List<MealPlanDay>.from(mealPlan.days);
+      final dayIndex = updatedDays.indexWhere((day) => day.dayNumber == dayNumber);
+      
+      if (dayIndex >= 0) {
+        updatedDays[dayIndex] = newDay;
+      } else {
+        updatedDays.add(newDay);
+        updatedDays.sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+      }
       
       // Create updated meal plan
       final updatedMealPlan = mealPlan.copyWith(
@@ -230,7 +334,7 @@ class MealPlanService {
       );
       
       // Save to Firestore
-      await saveMealPlan(updatedMealPlan);
+      await updateMealPlan(updatedMealPlan);
       
       return updatedMealPlan;
     } catch (e) {
@@ -239,24 +343,15 @@ class MealPlanService {
     }
   }
   
-  /// Regenerate a specific meal in a day
+  /// Regenerate a specific meal in a meal plan
   Future<MealPlan> regenerateMeal({
     required MealPlan mealPlan,
     required int dayNumber,
-    required String mealType, // 'breakfast', 'lunch', 'dinner', 'snack'
+    required String mealType, // 'breakfast', 'lunch', 'dinner', or 'snack'
   }) async {
     try {
-      // TODO: Implement meal-specific regeneration
-      // This would require a different endpoint or prompt structure
-      // For now, regenerate the entire day and keep the non-targeted meals
-      
-      // Find the current day
-      final currentDay = mealPlan.days.firstWhere(
-        (day) => day.dayNumber == dayNumber,
-      );
-      
       // Create the AI service
-      final aiService = await AIService.create();
+      final aiService = await ai.AIService.create();
       
       // Extract parameters from the original meal plan
       final params = mealPlan.generationParameters;
@@ -272,73 +367,76 @@ class MealPlanService {
           .toList();
           
       final familySize = params['familySize'] as int;
-      final additionalPreferences = Map<String, dynamic>.from(params['additionalPreferences'] ?? {});
       
-      // Add specific instructions for the targeted meal
-      additionalPreferences['targetMeal'] = mealType;
-      additionalPreferences['regenerateOnly'] = mealType;
+      // Additional parameters for the specific meal
+      final additionalPrefs = Map<String, dynamic>.from(params['additionalPreferences'] ?? {});
+      additionalPrefs['singleMeal'] = true;
+      additionalPrefs['mealType'] = mealType;
       
-      // Generate a single day meal plan with focus on the specific meal
+      // Generate just one day with focus on the specific meal
       final aiResponse = await aiService.generateMealPlan(
         cuisinePreferences: cuisinePreferences,
         dietaryPreferences: dietaryPreferences,
         familySize: familySize,
-        numberOfDays: 1, // Generate just one day
-        additionalPreferences: additionalPreferences,
+        numberOfDays: 1, // Just one day
+        additionalPreferences: additionalPrefs,
       );
       
-      // Parse the response
-      final dayData = (aiResponse['mealPlan']['days'] as List).first as Map<String, dynamic>;
-      final newMealData = dayData[mealType] as Map<String, dynamic>;
+      // Extract the day from the response
+      final dayData = (aiResponse['mealPlan']['days'] as List).first;
+      
+      // Extract the specific meal from the AI response
+      final newMealData = (dayData as Map<String, dynamic>)[mealType.toLowerCase()];
+      
+      // Convert to our model
       final newMeal = Meal.fromAIResponse(newMealData);
       
-      // Create updated day with only the targeted meal replaced
+      // Update the meal plan with the new meal
+      final updatedDays = List<MealPlanDay>.from(mealPlan.days);
+      final dayIndex = updatedDays.indexWhere((day) => day.dayNumber == dayNumber);
+      
       MealPlanDay updatedDay;
-      switch (mealType) {
-        case 'breakfast':
+      
+      if (dayIndex >= 0) {
+        final day = updatedDays[dayIndex];
+        
+        // Create a new day with the regenerated meal
+        if (mealType.toLowerCase() == 'breakfast') {
           updatedDay = MealPlanDay(
-            dayNumber: dayNumber,
+            dayNumber: day.dayNumber,
             breakfast: newMeal,
-            lunch: currentDay.lunch,
-            dinner: currentDay.dinner,
-            snack: currentDay.snack,
+            lunch: day.lunch,
+            dinner: day.dinner,
+            snack: day.snack,
           );
-          break;
-        case 'lunch':
+        } else if (mealType.toLowerCase() == 'lunch') {
           updatedDay = MealPlanDay(
-            dayNumber: dayNumber,
-            breakfast: currentDay.breakfast,
+            dayNumber: day.dayNumber,
+            breakfast: day.breakfast,
             lunch: newMeal,
-            dinner: currentDay.dinner,
-            snack: currentDay.snack,
+            dinner: day.dinner,
+            snack: day.snack,
           );
-          break;
-        case 'dinner':
+        } else if (mealType.toLowerCase() == 'dinner') {
           updatedDay = MealPlanDay(
-            dayNumber: dayNumber,
-            breakfast: currentDay.breakfast,
-            lunch: currentDay.lunch,
+            dayNumber: day.dayNumber,
+            breakfast: day.breakfast,
+            lunch: day.lunch,
             dinner: newMeal,
-            snack: currentDay.snack,
+            snack: day.snack,
           );
-          break;
-        case 'snack':
+        } else { // snack
           updatedDay = MealPlanDay(
-            dayNumber: dayNumber,
-            breakfast: currentDay.breakfast,
-            lunch: currentDay.lunch,
-            dinner: currentDay.dinner,
+            dayNumber: day.dayNumber,
+            breakfast: day.breakfast,
+            lunch: day.lunch,
+            dinner: day.dinner,
             snack: newMeal,
           );
-          break;
-        default:
-          throw Exception('Invalid meal type: $mealType');
+        }
+        
+        updatedDays[dayIndex] = updatedDay;
       }
-      
-      // Create updated days list
-      final updatedDays = mealPlan.days.map((day) {
-        return day.dayNumber == dayNumber ? updatedDay : day;
-      }).toList();
       
       // Create updated meal plan
       final updatedMealPlan = mealPlan.copyWith(
@@ -347,7 +445,7 @@ class MealPlanService {
       );
       
       // Save to Firestore
-      await saveMealPlan(updatedMealPlan);
+      await updateMealPlan(updatedMealPlan);
       
       return updatedMealPlan;
     } catch (e) {

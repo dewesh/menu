@@ -60,26 +60,59 @@ class MealPlan {
     String? title,
     required Map<String, dynamic> generationParameters,
   }) {
-    final now = DateTime.now();
-    final mealPlanId = FirebaseFirestore.instance.collection('mealPlans').doc().id;
+    try {
+      final now = DateTime.now();
+      final mealPlanId = FirebaseFirestore.instance.collection('mealPlans').doc().id;
 
-    final rawDays = (responseJson['mealPlan']['days'] as List);
-    final days = rawDays
-        .map((dayData) => MealPlanDay.fromAIResponse(dayData as Map<String, dynamic>))
-        .toList();
+      // Validate the response structure
+      if (!responseJson.containsKey('mealPlan') || 
+          !(responseJson['mealPlan'] is Map) || 
+          !responseJson['mealPlan'].containsKey('days') ||
+          !(responseJson['mealPlan']['days'] is List)) {
+        throw FormatException('Invalid meal plan response structure: ${responseJson.keys}');
+      }
 
-    // Sort days by day number if needed
-    days.sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+      final rawDays = (responseJson['mealPlan']['days'] as List);
+      if (rawDays.isEmpty) {
+        throw FormatException('Meal plan contains no days');
+      }
+      
+      final days = <MealPlanDay>[];
+      
+      // Process each day with error handling
+      for (var dayData in rawDays) {
+        try {
+          if (dayData is Map<String, dynamic>) {
+            days.add(MealPlanDay.fromAIResponse(dayData));
+          } else {
+            print('Warning: Skipping invalid day data: $dayData');
+          }
+        } catch (e) {
+          print('Error processing day data: $e');
+          // Continue with other days instead of failing completely
+        }
+      }
+      
+      if (days.isEmpty) {
+        throw FormatException('Failed to process any valid days from the meal plan');
+      }
 
-    return MealPlan(
-      mealPlanId: mealPlanId,
-      userId: userId,
-      title: title ?? 'Meal Plan for ${days.length} days',
-      createdAt: now,
-      lastModified: now,
-      days: days,
-      generationParameters: generationParameters,
-    );
+      // Sort days by day number if needed
+      days.sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+
+      return MealPlan(
+        mealPlanId: mealPlanId,
+        userId: userId,
+        title: title ?? 'Meal Plan for ${days.length} days',
+        createdAt: now,
+        lastModified: now,
+        days: days,
+        generationParameters: generationParameters,
+      );
+    } catch (e) {
+      print('Error creating meal plan from AI response: $e');
+      rethrow;
+    }
   }
 
   /// Create a copy of MealPlan with modified fields
@@ -146,13 +179,76 @@ class MealPlanDay {
 
   /// Create MealPlanDay from the AI generated JSON
   factory MealPlanDay.fromAIResponse(Map<String, dynamic> dayData) {
-    return MealPlanDay(
-      dayNumber: dayData['day'] as int,
-      breakfast: Meal.fromAIResponse(dayData['breakfast'] as Map<String, dynamic>),
-      lunch: Meal.fromAIResponse(dayData['lunch'] as Map<String, dynamic>),
-      dinner: Meal.fromAIResponse(dayData['dinner'] as Map<String, dynamic>),
-      snack: Meal.fromAIResponse(dayData['snack'] as Map<String, dynamic>),
-    );
+    try {
+      // Validate day number exists
+      final dayNumber = dayData.containsKey('day') ? dayData['day'] as int : 1;
+      
+      // Create a placeholder for missing or invalid meals
+      final placeholderMeal = Meal(
+        name: "Meal data unavailable",
+        cuisineType: "Not specified",
+        ingredients: [],
+        instructions: "No instructions available. This meal could not be properly generated.",
+        nutritionalInfo: NutritionalInfo(calories: 0, protein: 0, carbs: 0, fat: 0),
+      );
+      
+      // Parse each meal with error handling
+      Meal breakfast = placeholderMeal;
+      Meal lunch = placeholderMeal;
+      Meal dinner = placeholderMeal;
+      Meal snack = placeholderMeal;
+      
+      try {
+        if (dayData.containsKey('breakfast') && dayData['breakfast'] is Map<String, dynamic>) {
+          breakfast = Meal.fromAIResponse(dayData['breakfast'] as Map<String, dynamic>);
+        } else {
+          print('Warning: Invalid breakfast data for day $dayNumber');
+        }
+      } catch (e) {
+        print('Error parsing breakfast for day $dayNumber: $e');
+      }
+      
+      try {
+        if (dayData.containsKey('lunch') && dayData['lunch'] is Map<String, dynamic>) {
+          lunch = Meal.fromAIResponse(dayData['lunch'] as Map<String, dynamic>);
+        } else {
+          print('Warning: Invalid lunch data for day $dayNumber');
+        }
+      } catch (e) {
+        print('Error parsing lunch for day $dayNumber: $e');
+      }
+      
+      try {
+        if (dayData.containsKey('dinner') && dayData['dinner'] is Map<String, dynamic>) {
+          dinner = Meal.fromAIResponse(dayData['dinner'] as Map<String, dynamic>);
+        } else {
+          print('Warning: Invalid dinner data for day $dayNumber');
+        }
+      } catch (e) {
+        print('Error parsing dinner for day $dayNumber: $e');
+      }
+      
+      try {
+        if (dayData.containsKey('snack') && dayData['snack'] is Map<String, dynamic>) {
+          snack = Meal.fromAIResponse(dayData['snack'] as Map<String, dynamic>);
+        } else {
+          print('Warning: Invalid snack data for day $dayNumber');
+        }
+      } catch (e) {
+        print('Error parsing snack for day $dayNumber: $e');
+      }
+      
+      return MealPlanDay(
+        dayNumber: dayNumber,
+        breakfast: breakfast,
+        lunch: lunch,
+        dinner: dinner,
+        snack: snack,
+      );
+    } catch (e) {
+      print('Error creating MealPlanDay from AI response: $e');
+      rethrow;
+    }
   }
 }
 
@@ -202,26 +298,68 @@ class Meal {
 
   /// Create Meal from the AI generated JSON
   factory Meal.fromAIResponse(Map<String, dynamic> mealData) {
-    final List<MealIngredient> ingredients = [];
-    
-    // Handle possible variations in the AI response format
-    if (mealData['ingredients'] is List) {
-      ingredients.addAll(
-        (mealData['ingredients'] as List)
-            .map((ingredient) => 
-                MealIngredient.fromAIResponse(ingredient as Map<String, dynamic>)
-            )
-            .toList(),
+    try {
+      // Get name or use placeholder
+      final name = mealData.containsKey('name') && mealData['name'] is String
+          ? mealData['name'] as String
+          : "Unnamed Meal";
+          
+      // Get cuisine type safely
+      final cuisineType = mealData.containsKey('cuisineType') && mealData['cuisineType'] is String
+          ? mealData['cuisineType'] as String
+          : "Not specified";
+      
+      // Parse ingredients with error handling
+      final List<MealIngredient> ingredients = [];
+      if (mealData.containsKey('ingredients') && mealData['ingredients'] is List) {
+        for (var ingredientData in mealData['ingredients'] as List) {
+          try {
+            if (ingredientData is Map<String, dynamic>) {
+              ingredients.add(MealIngredient.fromAIResponse(ingredientData));
+            }
+          } catch (e) {
+            print('Error parsing ingredient: $e');
+            // Continue with other ingredients
+          }
+        }
+      }
+      
+      // Get instructions safely
+      final instructions = mealData.containsKey('instructions') && mealData['instructions'] is String
+          ? mealData['instructions'] as String
+          : "No instructions available";
+      
+      // Parse nutritional info with fallback
+      NutritionalInfo nutritionalInfo;
+      try {
+        if (mealData.containsKey('nutritionalInfo') && mealData['nutritionalInfo'] is Map<String, dynamic>) {
+          nutritionalInfo = NutritionalInfo.fromAIResponse(mealData['nutritionalInfo'] as Map<String, dynamic>);
+        } else {
+          nutritionalInfo = NutritionalInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+        }
+      } catch (e) {
+        print('Error parsing nutritional info: $e');
+        nutritionalInfo = NutritionalInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+      }
+      
+      return Meal(
+        name: name,
+        cuisineType: cuisineType,
+        ingredients: ingredients,
+        instructions: instructions,
+        nutritionalInfo: nutritionalInfo,
+      );
+    } catch (e) {
+      print('Error creating Meal from AI response: $e');
+      // Return a minimal valid meal rather than failing
+      return Meal(
+        name: "Error parsing meal",
+        cuisineType: "Unknown",
+        ingredients: [],
+        instructions: "An error occurred while processing this meal.",
+        nutritionalInfo: NutritionalInfo(calories: 0, protein: 0, carbs: 0, fat: 0),
       );
     }
-    
-    return Meal(
-      name: mealData['name'] as String,
-      cuisineType: mealData['cuisineType'] as String?,
-      ingredients: ingredients,
-      instructions: mealData['instructions'] as String,
-      nutritionalInfo: NutritionalInfo.fromAIResponse(mealData['nutritionalInfo'] as Map<String, dynamic>),
-    );
   }
 
   /// Create a copy of Meal with modified fields
@@ -312,35 +450,49 @@ class NutritionalInfo {
   factory NutritionalInfo.fromMap(Map<String, dynamic> map) {
     return NutritionalInfo(
       calories: map['calories'] as int,
-      protein: (map['protein'] is int) 
-          ? (map['protein'] as int).toDouble() 
-          : map['protein'] as double,
-      carbs: (map['carbs'] is int) 
-          ? (map['carbs'] as int).toDouble() 
-          : map['carbs'] as double,
-      fat: (map['fat'] is int) 
-          ? (map['fat'] as int).toDouble() 
-          : map['fat'] as double,
+      protein: (map['protein'] as num).toDouble(),
+      carbs: (map['carbs'] as num).toDouble(),
+      fat: (map['fat'] as num).toDouble(),
     );
   }
 
-  /// Create NutritionalInfo from the AI generated JSON
+  /// Create NutritionalInfo from AI response with error handling
   factory NutritionalInfo.fromAIResponse(Map<String, dynamic> nutritionData) {
-    // Handle possible variations in the AI response format
-    final calories = nutritionData['calories'] is String
-        ? int.tryParse(nutritionData['calories'] as String) ?? 0
-        : nutritionData['calories'] as int? ?? 0;
-        
-    final protein = _parseDoubleValue(nutritionData['protein']);
-    final carbs = _parseDoubleValue(nutritionData['carbs']);
-    final fat = _parseDoubleValue(nutritionData['fat']);
-    
-    return NutritionalInfo(
-      calories: calories,
-      protein: protein,
-      carbs: carbs,
-      fat: fat,
-    );
+    try {
+      // Convert numeric values safely
+      int getIntValue(String key, int defaultValue) {
+        if (!nutritionData.containsKey(key)) return defaultValue;
+        final value = nutritionData[key];
+        if (value is int) return value;
+        if (value is double) return value.round();
+        if (value is String) return int.tryParse(value) ?? defaultValue;
+        return defaultValue;
+      }
+      
+      double getDoubleValue(String key, double defaultValue) {
+        if (!nutritionData.containsKey(key)) return defaultValue;
+        final value = nutritionData[key];
+        if (value is double) return value;
+        if (value is int) return value.toDouble();
+        if (value is String) return double.tryParse(value) ?? defaultValue;
+        return defaultValue;
+      }
+
+      return NutritionalInfo(
+        calories: getIntValue('calories', 0),
+        protein: getDoubleValue('protein', 0),
+        carbs: getDoubleValue('carbs', 0),
+        fat: getDoubleValue('fat', 0),
+      );
+    } catch (e) {
+      print('Error parsing nutritional info: $e');
+      return NutritionalInfo(
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+      );
+    }
   }
 }
 

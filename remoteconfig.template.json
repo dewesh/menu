@@ -1,0 +1,52 @@
+{
+  "parameters": {
+    "ai_provider": {
+      "defaultValue": {
+        "value": "openai"
+      },
+      "description": "Default AI provider for meal planning"
+    },
+    "openai_api_key": {
+      "defaultValue": {
+        "value": "your-openai-api-key-placeholder"
+      },
+      "description": "API Key for OpenAI service"
+    },
+    "openai_model": {
+      "defaultValue": {
+        "value": "gpt-3.5-turbo"
+      },
+      "description": "Model name for OpenAI"
+    },
+    "anthropic_api_key": {
+      "defaultValue": {
+        "value": "your-anthropic-api-key-placeholder"
+      },
+      "description": "API Key for Anthropic service"
+    },
+    "anthropic_model": {
+      "defaultValue": {
+        "value": "claude-2"
+      },
+      "description": "Model name for Anthropic"
+    },
+    "google_api_key": {
+      "defaultValue": {
+        "value": "your-google-api-key-placeholder"
+      },
+      "description": "API Key for Google service"
+    },
+    "google_model": {
+      "defaultValue": {
+        "value": "gemini-pro"
+      },
+      "description": "Model name for Google"
+    }
+  },
+  "version": {
+    "versionNumber": "1",
+    "updateTime": "2023-05-28T00:00:00.000Z",
+    "updateOrigin": "CONSOLE",
+    "updateType": "INCREMENTAL_UPDATE"
+  }
+}
