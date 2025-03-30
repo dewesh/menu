@@ -69,8 +69,10 @@ class SystemPreferences {
   final bool isDarkMode; // Convenience field that maps to themeMode='dark'
   final int familySize;
   final List<String> dietaryPreferences;
-  final List<String> cuisinePreferences;
+  final List<CuisinePreference> cuisinePreferences;
   final List<FamilyMember> familyMembers;
+  final List<HealthCondition> healthConditions;
+  final TastePreferences tastePreferences;
 
   SystemPreferences({
     this.themeMode = 'light',
@@ -80,7 +82,12 @@ class SystemPreferences {
     this.dietaryPreferences = const [],
     this.cuisinePreferences = const [],
     this.familyMembers = const [],
-  }) : this.isDarkMode = isDarkMode ?? (themeMode == 'dark');
+    List<HealthCondition>? healthConditions,
+    TastePreferences? tastePreferences,
+  }) : 
+    this.isDarkMode = isDarkMode ?? (themeMode == 'dark'),
+    this.healthConditions = healthConditions ?? [],
+    this.tastePreferences = tastePreferences ?? TastePreferences(spiceLevel: 3, sweetness: 3, sourness: 3);
 
   /// Convert SystemPreferences object to a map for Firestore
   Map<String, dynamic> toMap() {
@@ -90,23 +97,36 @@ class SystemPreferences {
       'isDarkMode': isDarkMode,
       'familySize': familySize,
       'dietaryPreferences': dietaryPreferences,
-      'cuisinePreferences': cuisinePreferences,
+      'cuisinePreferences': cuisinePreferences.map((pref) => pref.toMap()).toList(),
       'familyMembers': familyMembers.map((member) => member.toMap()).toList(),
+      'healthConditions': healthConditions.map((condition) => condition.toMap()).toList(),
+      'tastePreferences': tastePreferences.toMap(),
     };
   }
 
-  /// Create SystemPreferences object from Firestore document
+  /// Create SystemPreferences from a map (Firestore document)
   factory SystemPreferences.fromMap(Map<String, dynamic> map) {
     return SystemPreferences(
       themeMode: map['themeMode'] as String? ?? 'light',
       notificationsEnabled: map['notificationsEnabled'] as bool? ?? true,
+      isDarkMode: map['isDarkMode'] as bool? ?? false,
       familySize: map['familySize'] as int? ?? 1,
       dietaryPreferences: List<String>.from(map['dietaryPreferences'] as List? ?? []),
-      cuisinePreferences: List<String>.from(map['cuisinePreferences'] as List? ?? []),
-      familyMembers: map['familyMembers'] != null
-          ? List<FamilyMember>.from(
-              (map['familyMembers'] as List).map((x) => FamilyMember.fromMap(x)))
-          : [],
+      cuisinePreferences: (map['cuisinePreferences'] as List?)
+              ?.map((prefMap) => CuisinePreference.fromMap(prefMap as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      familyMembers: (map['familyMembers'] as List?)
+              ?.map((memberMap) => FamilyMember.fromMap(memberMap as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      healthConditions: (map['healthConditions'] as List?)
+          ?.map((conditionMap) => HealthCondition.fromMap(conditionMap as Map<String, dynamic>))
+          .toList() ??
+          [],
+      tastePreferences: map['tastePreferences'] != null
+          ? TastePreferences.fromMap(map['tastePreferences'] as Map<String, dynamic>)
+          : TastePreferences(spiceLevel: 3, sweetness: 3, sourness: 3),
     );
   }
 }

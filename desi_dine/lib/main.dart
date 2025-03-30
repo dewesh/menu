@@ -8,6 +8,8 @@ import 'services/firebase_service.dart';
 import 'services/navigation_service.dart';
 import 'screens/home/main_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/preferences/ai_config_screen.dart';
+import 'screens/meal_plan/generate_meal_plan_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,6 +84,8 @@ class _MyAppState extends State<MyApp> {
       routes: {
         Constants.routeOnboarding: (context) => const OnboardingScreen(),
         Constants.routeHome: (context) => const MainScreen(),
+        Constants.routeAiConfig: (context) => const AIConfigScreen(),
+        Constants.routeMealPlanGenerate: (context) => const GenerateMealPlanScreen(),
       },
     );
   }

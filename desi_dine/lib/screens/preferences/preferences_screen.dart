@@ -431,6 +431,15 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             ),
           ),
           ListTile(
+            title: const Text('AI Configuration'),
+            subtitle: const Text('Configure AI provider settings for meal planning'),
+            leading: const Icon(Icons.smart_toy),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.of(context).pushNamed(Constants.routeAiConfig);
+            },
+          ),
+          ListTile(
             title: const Text('Dietary Preferences'),
             subtitle: const Text('Update your dietary restrictions and preferences'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),

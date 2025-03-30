@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'models.dart';
+import 'meal_model.dart' as meal;  // Import with a prefix to avoid conflicts
 
 /// Utility class to test all data models
 class ModelTest {
@@ -20,7 +21,7 @@ class ModelTest {
     _testGroceryModel();
     
     print('✅ MODEL TEST: All model tests completed successfully!');
-    testResults.add('All model tests completed successfully!');
+    testResults.add('✅ MODEL TEST: All model tests completed successfully!');
     
     return testResults;
   }
@@ -126,25 +127,25 @@ class ModelTest {
     print('🧪 MODEL TEST: Testing Meal model...');
     testResults.add('Testing Meal model...');
     
-    // Create test data
     final now = DateTime.now();
     
-    final nutritionalInfo = NutritionalInfo(
+    // Create test nutritional info
+    final nutritionalInfo = meal.NutritionalInfo(
       calories: 450,
-      protein: 15.5,
-      carbs: 65.0,
-      fat: 12.3,
-      fiber: 8.5,
+      protein: 25.0,
+      carbs: 30.0,
+      fat: 20.0,
+      fiber: 3.0,
     );
     
-    final recipeIngredient1 = RecipeIngredient(
+    final recipeIngredient1 = meal.RecipeIngredient(
       ingredientId: 'ing123',
       name: 'Rice',
       quantity: 200.0,
       unit: 'g',
     );
     
-    final recipeIngredient2 = RecipeIngredient(
+    final recipeIngredient2 = meal.RecipeIngredient(
       ingredientId: 'ing456',
       name: 'Lentils',
       quantity: 100.0,
@@ -152,50 +153,50 @@ class ModelTest {
       isOptional: false,
     );
     
-    final step1 = PreparationStep(
+    final step1 = meal.PreparationStep(
       stepNumber: 1,
       description: 'Wash rice and lentils thoroughly.',
     );
     
-    final step2 = PreparationStep(
+    final step2 = meal.PreparationStep(
       stepNumber: 2,
       description: 'Boil water and add rice and lentils.',
       timeTakenMinutes: 20,
     );
     
-    final recipe = Recipe(
+    final recipe = meal.Recipe(
       ingredients: [recipeIngredient1, recipeIngredient2],
       preparationSteps: [step1, step2],
       servingSize: 4,
       notes: 'Best served hot with a side of yogurt.',
     );
     
-    final meal = Meal(
+    final testMeal = meal.Meal(
       mealId: 'meal123',
-      name: 'Khichdi',
-      description: 'A comforting rice and lentil dish.',
-      type: 'lunch',
-      cuisineType: 'North Indian',
-      preparationTime: 10,
+      name: 'Butter Chicken',
+      description: 'A classic Indian dish',
+      type: 'dinner',
+      cuisineType: 'north-indian',
+      preparationTime: 20,
       cookingTime: 30,
-      difficultyLevel: 'easy',
+      difficultyLevel: 'medium',
       nutritionalInfo: nutritionalInfo,
       recipe: recipe,
-      tags: ['comfort food', 'easy', 'one-pot'],
-      suitableHealthConditions: ['fever', 'recovery'],
+      tags: const ['creamy', 'spicy'],
+      suitableHealthConditions: const [],
       seasonalRelevance: 'year-round',
       createdAt: now,
       lastModified: now,
     );
     
     // Convert to map and back
-    final mealMap = meal.toMap();
-    final mealFromMap = Meal.fromMap(mealMap);
+    final mealMap = testMeal.toMap();
+    final mealFromMap = meal.Meal.fromMap(mealMap);
     
     // Log results for debugging
-    final result1 = 'Meal conversion: ${meal.name == mealFromMap.name ? "✅ SUCCESS" : "❌ FAILED"}';
-    final result2 = 'Recipe ingredients count: ${meal.recipe.ingredients.length == mealFromMap.recipe.ingredients.length ? "✅ SUCCESS" : "❌ FAILED"}';
-    final result3 = 'Preparation steps count: ${meal.recipe.preparationSteps.length == mealFromMap.recipe.preparationSteps.length ? "✅ SUCCESS" : "❌ FAILED"}';
+    final result1 = 'Meal conversion: ${testMeal.name == mealFromMap.name ? "✅ SUCCESS" : "❌ FAILED"}';
+    final result2 = 'Recipe ingredients count: ${testMeal.recipe.ingredients.length == mealFromMap.recipe.ingredients.length ? "✅ SUCCESS" : "❌ FAILED"}';
+    final result3 = 'Preparation steps count: ${testMeal.recipe.preparationSteps.length == mealFromMap.recipe.preparationSteps.length ? "✅ SUCCESS" : "❌ FAILED"}';
     
     print('🧪 MODEL TEST: $result1');
     print('🧪 MODEL TEST: $result2');
@@ -319,25 +320,25 @@ class ModelTest {
     );
     
     // Test MealPlan models
-    final mealPlanMeal1 = MealPlanMeal(
+    final mealPlanMeal1 = GroceryMealPlanMeal(
       mealId: 'meal123',
       mealType: 'breakfast',
       servings: 2,
     );
     
-    final mealPlanMeal2 = MealPlanMeal(
+    final mealPlanMeal2 = GroceryMealPlanMeal(
       mealId: 'meal456',
       mealType: 'dinner',
       servings: 4,
       isCompleted: true,
     );
     
-    final mealPlanDay = MealPlanDay(
+    final mealPlanDay = GroceryMealPlanDay(
       date: now,
       meals: [mealPlanMeal1, mealPlanMeal2],
     );
     
-    final mealPlan = MealPlan(
+    final mealPlan = GroceryMealPlan(
       mealPlanId: 'plan123',
       userId: 'user123',
       title: 'This Week\'s Plan',
@@ -353,7 +354,7 @@ class ModelTest {
     final groceryListFromMap = GroceryList.fromMap(groceryListMap);
     
     final mealPlanMap = mealPlan.toMap();
-    final mealPlanFromMap = MealPlan.fromMap(mealPlanMap);
+    final mealPlanFromMap = GroceryMealPlan.fromMap(mealPlanMap);
     
     // Log results for debugging
     final result1 = 'GroceryList conversion: ${groceryList.title == groceryListFromMap.title ? "✅ SUCCESS" : "❌ FAILED"}';

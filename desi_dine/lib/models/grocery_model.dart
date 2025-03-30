@@ -166,17 +166,17 @@ class GroceryItem {
 }
 
 /// Meal plan model (used in associations with grocery lists)
-class MealPlan {
+class GroceryMealPlan {
   final String mealPlanId;
   final String userId;
   final String title;
   final DateTime startDate;
   final DateTime endDate;
-  final List<MealPlanDay> days;
+  final List<GroceryMealPlanDay> days;
   final DateTime createdAt;
   final DateTime lastModified;
 
-  MealPlan({
+  GroceryMealPlan({
     required this.mealPlanId,
     required this.userId,
     required this.title,
@@ -187,7 +187,7 @@ class MealPlan {
     required this.lastModified,
   });
 
-  /// Convert MealPlan object to a map for Firestore
+  /// Convert GroceryMealPlan object to a map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'mealPlanId': mealPlanId,
@@ -201,17 +201,17 @@ class MealPlan {
     };
   }
 
-  /// Create MealPlan object from Firestore document
-  factory MealPlan.fromMap(Map<String, dynamic> map) {
-    return MealPlan(
+  /// Create GroceryMealPlan object from Firestore document
+  factory GroceryMealPlan.fromMap(Map<String, dynamic> map) {
+    return GroceryMealPlan(
       mealPlanId: map['mealPlanId'] as String,
       userId: map['userId'] as String,
       title: map['title'] as String,
       startDate: (map['startDate'] as Timestamp).toDate(),
       endDate: (map['endDate'] as Timestamp).toDate(),
-      days: List<MealPlanDay>.from(
+      days: List<GroceryMealPlanDay>.from(
         (map['days'] as List).map(
-          (x) => MealPlanDay.fromMap(x),
+          (x) => GroceryMealPlanDay.fromMap(x),
         ),
       ),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -221,16 +221,16 @@ class MealPlan {
 }
 
 /// Day in a meal plan
-class MealPlanDay {
+class GroceryMealPlanDay {
   final DateTime date;
-  final List<MealPlanMeal> meals;
+  final List<GroceryMealPlanMeal> meals;
 
-  MealPlanDay({
+  GroceryMealPlanDay({
     required this.date,
     required this.meals,
   });
 
-  /// Convert MealPlanDay object to a map for Firestore
+  /// Convert GroceryMealPlanDay object to a map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'date': Timestamp.fromDate(date),
@@ -238,13 +238,13 @@ class MealPlanDay {
     };
   }
 
-  /// Create MealPlanDay object from Firestore document
-  factory MealPlanDay.fromMap(Map<String, dynamic> map) {
-    return MealPlanDay(
+  /// Create GroceryMealPlanDay object from Firestore document
+  factory GroceryMealPlanDay.fromMap(Map<String, dynamic> map) {
+    return GroceryMealPlanDay(
       date: (map['date'] as Timestamp).toDate(),
-      meals: List<MealPlanMeal>.from(
+      meals: List<GroceryMealPlanMeal>.from(
         (map['meals'] as List).map(
-          (x) => MealPlanMeal.fromMap(x),
+          (x) => GroceryMealPlanMeal.fromMap(x),
         ),
       ),
     );
@@ -252,20 +252,20 @@ class MealPlanDay {
 }
 
 /// Meal in a meal plan
-class MealPlanMeal {
+class GroceryMealPlanMeal {
   final String mealId;
   final String mealType; // breakfast, lunch, dinner, snack
   final int servings;
   final bool isCompleted;
 
-  MealPlanMeal({
+  GroceryMealPlanMeal({
     required this.mealId,
     required this.mealType,
     required this.servings,
     this.isCompleted = false,
   });
 
-  /// Convert MealPlanMeal object to a map for Firestore
+  /// Convert GroceryMealPlanMeal object to a map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'mealId': mealId,
@@ -275,9 +275,9 @@ class MealPlanMeal {
     };
   }
 
-  /// Create MealPlanMeal object from Firestore document
-  factory MealPlanMeal.fromMap(Map<String, dynamic> map) {
-    return MealPlanMeal(
+  /// Create GroceryMealPlanMeal object from Firestore document
+  factory GroceryMealPlanMeal.fromMap(Map<String, dynamic> map) {
+    return GroceryMealPlanMeal(
       mealId: map['mealId'] as String,
       mealType: map['mealType'] as String,
       servings: map['servings'] as int,

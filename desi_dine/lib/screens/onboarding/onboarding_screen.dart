@@ -72,7 +72,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Create system preferences with cuisine preferences
       final systemPreferences = SystemPreferences(
         themeMode: 'light',
-        cuisinePreferences: _cuisinePreferences.map((pref) => pref.cuisineType).toList(),
+        cuisinePreferences: _cuisinePreferences,
       );
       
       // Create or update user

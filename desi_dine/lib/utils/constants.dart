@@ -13,11 +13,23 @@ class Constants {
   static const String mealPlansCollection = 'mealPlans';
   static const String groceryListsCollection = 'groceryLists';
   static const String ingredientsCollection = 'ingredients';
+  static const String aiConfigCollection = 'aiConfig';
   
   // Shared Preferences Keys
   static const String prefIsOnboardingComplete = 'isOnboardingComplete';
   static const String prefUserId = 'userId';
   static const String prefThemeMode = 'themeMode';
+  static const String prefAIProviderConfig = 'aiProviderConfig';
+  
+  // AI Provider Types
+  static const String aiProviderOpenAI = 'openai';
+  static const String aiProviderAnthropic = 'anthropic';
+  static const String aiProviderGoogle = 'google';
+  
+  // Default AI Models
+  static const String aiModelOpenAI = 'gpt-3.5-turbo';
+  static const String aiModelAnthropic = 'claude-2';
+  static const String aiModelGoogle = 'gemini-pro';
   
   // Routes
   static const String routeOnboarding = '/onboarding';
@@ -26,6 +38,8 @@ class Constants {
   static const String routeGrocery = '/grocery';
   static const String routePreferences = '/preferences';
   static const String routeMealDetail = '/meal-detail';
+  static const String routeAiConfig = '/ai-config';
+  static const String routeMealPlanGenerate = '/meal-plan/generate';
   
   // Onboarding Routes
   static const String routeOnboardingWelcome = '/onboarding/welcome';

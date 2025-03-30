@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
+import '../models/meal_model.dart' as meal;
 import 'services.dart';
 
 /// Utility class to test all Firebase service operations
@@ -84,7 +85,10 @@ class ServiceTest {
           isDarkMode: true,
           familySize: 4,
           dietaryPreferences: const ['vegetarian'],
-          cuisinePreferences: const ['north-indian', 'south-indian'],
+          cuisinePreferences: [
+            CuisinePreference(cuisineType: 'north-indian', frequencyPreference: 'weekly'),
+            CuisinePreference(cuisineType: 'south-indian', frequencyPreference: 'monthly'),
+          ],
           familyMembers: [
             FamilyMember(name: 'Test Member', age: 30, dietaryRestrictions: const ['lactose-free']),
           ],
@@ -162,7 +166,7 @@ class ServiceTest {
       final mealService = MealService.instance;
       
       // Create test meal data
-      final testMeal = Meal(
+      final testMeal = meal.Meal(
         mealId: 'test_meal_${DateTime.now().millisecondsSinceEpoch}',
         name: 'Test Butter Chicken',
         description: 'A delicious test meal',
@@ -171,22 +175,22 @@ class ServiceTest {
         preparationTime: 20,
         cookingTime: 30,
         difficultyLevel: 'medium',
-        nutritionalInfo: NutritionalInfo(
+        nutritionalInfo: meal.NutritionalInfo(
           calories: 450,
           protein: 25.0,
           carbs: 30.0,
           fat: 20.0,
           fiber: 3.0,
         ),
-        recipe: Recipe(
+        recipe: meal.Recipe(
           ingredients: [
-            RecipeIngredient(
+            meal.RecipeIngredient(
               ingredientId: 'chicken',
               name: 'Chicken',
               quantity: 500.0,
               unit: 'g',
             ),
-            RecipeIngredient(
+            meal.RecipeIngredient(
               ingredientId: 'butter',
               name: 'Butter',
               quantity: 50.0,
@@ -194,11 +198,11 @@ class ServiceTest {
             ),
           ],
           preparationSteps: [
-            PreparationStep(
+            meal.PreparationStep(
               stepNumber: 1,
               description: 'Marinate the chicken',
             ),
-            PreparationStep(
+            meal.PreparationStep(
               stepNumber: 2,
               description: 'Cook with butter and spices',
             ),
