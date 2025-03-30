@@ -40,10 +40,12 @@ class _MyAppState extends State<MyApp> {
     // Load theme preference
     await _loadThemePreference();
     
-    // Determine initial route based on onboarding status
-    _initialRoute = await _navigationService.getInitialRoute();
+    // Always check SharedPreferences for onboarding status on each app start
+    final prefs = await SharedPreferences.getInstance();
+    final isOnboardingComplete = prefs.getBool(Constants.prefIsOnboardingComplete) ?? false;
     
     setState(() {
+      _initialRoute = isOnboardingComplete ? Constants.routeHome : Constants.routeOnboarding;
       _isLoading = false;
     });
   }
